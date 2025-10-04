@@ -27,7 +27,7 @@ Claude: Card 1 reviewed. Next review in 6 days.
 - ✅ **8 MCP tools** for card management (add, search, review, edit, delete, stats)
 - ✅ **GitHub OAuth** authentication with user isolation
 - ✅ **Cloudflare D1** SQLite database (free tier)
-- ✅ **SM-2 algorithm** for optimal review scheduling
+- ✅ **FSRS algorithm** for optimal review scheduling (modern, ML-based)
 - ✅ **Full-text search** with FTS5
 - ✅ **Works everywhere**: Claude web, Claude Desktop, Claude Code, Cursor, Windsurf
 - ✅ **Private & secure**: Your cards are isolated to your GitHub account
@@ -97,7 +97,7 @@ Follow [SETUP.md](SETUP.md) for complete deployment instructions.
 | `get_due_cards` | Get cards due for review today |
 | `search_cards` | Full-text search across cards |
 | `get_all_cards` | List all your cards |
-| `review_card` | Submit review with difficulty (1-5) |
+| `review_card` | Submit review with FSRS rating (1-4: Again/Hard/Good/Easy) |
 | `edit_card` | Update card instructions or tags |
 | `delete_card` | Permanently remove a card |
 | `get_stats` | View statistics (total, due, by tag) |
@@ -128,7 +128,7 @@ Claude reads these instructions and generates fresh, personalized practice every
 - **Auth**: GitHub OAuth via workers-oauth-provider
 - **Protocol**: MCP (Model Context Protocol)
 - **Language**: TypeScript
-- **Algorithm**: SM-2 spaced repetition
+- **Algorithm**: FSRS (Free Spaced Repetition Scheduler) via ts-fsrs
 
 ## Cost
 
@@ -157,7 +157,8 @@ npx @modelcontextprotocol/inspector
 Based on:
 - [Model Context Protocol](https://modelcontextprotocol.io)
 - [Cloudflare MCP Templates](https://github.com/cloudflare/ai/tree/main/demos)
-- [SM-2 Algorithm](https://en.wikipedia.org/wiki/SuperMemo#Description_of_SM-2_algorithm)
+- [FSRS Algorithm](https://github.com/open-spaced-repetition/fsrs4anki/wiki/The-Algorithm)
+- [ts-fsrs](https://github.com/open-spaced-repetition/ts-fsrs)
 
 ## License
 

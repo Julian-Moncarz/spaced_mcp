@@ -1,9 +1,10 @@
 /**
- * Spaced Repetition Core Logic for Cloudflare D1
- * Ported from Python SQLite implementation
+ * Spaced Repetition Core Logic for Cloudflare D1 using FSRS algorithm
  */
 
-export interface Card {
+import { fsrs, Card, Rating, State, type Grade, type RecordLogItem, createEmptyCard } from 'ts-fsrs';
+
+export interface CardData {
 	id: number;
 	instructions: string;
 	tags: string[];
@@ -22,6 +23,8 @@ export interface Stats {
 }
 
 export class SpacedRepetition {
+	private scheduler = fsrs();
+
 	constructor(
 		private db: D1Database,
 		private userId: string,
@@ -51,13 +54,28 @@ export class SpacedRepetition {
 			await this.db.batch(tagInserts);
 		}
 
-		// Create initial review record
+		// Create initial FSRS card state
+		const emptyCard = createEmptyCard();
 		await this.db
 			.prepare(
-				`INSERT INTO reviews (card_id, user_id, easiness_factor, interval, repetitions, next_review_date)
-         VALUES (?, ?, 2.5, 0, 0, DATE('now'))`,
+				`INSERT INTO reviews (card_id, user_id, state, due, stability, difficulty,
+         elapsed_days, scheduled_days, learning_steps, reps, lapses, last_review)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			)
-			.bind(cardId, this.userId)
+			.bind(
+				cardId,
+				this.userId,
+				emptyCard.state,
+				emptyCard.due.toISOString(),
+				emptyCard.stability,
+				emptyCard.difficulty,
+				emptyCard.elapsed_days,
+				emptyCard.scheduled_days,
+				emptyCard.learning_steps,
+				emptyCard.reps,
+				emptyCard.lapses,
+				emptyCard.last_review ? emptyCard.last_review.toISOString() : null,
+			)
 			.run();
 
 		return cardId;
@@ -66,14 +84,14 @@ export class SpacedRepetition {
 	/**
 	 * Search cards using FTS or simple filter
 	 */
-	async searchCards(query: string = "", tags: string[] = []): Promise<Card[]> {
+	async searchCards(query: string = "", tags: string[] = []): Promise<CardData[]> {
 		let sql: string;
 		let params: any[];
 
 		if (query) {
 			// Use FTS search
 			sql = `
-        SELECT c.id, c.instructions, r.next_review_date,
+        SELECT c.id, c.instructions, r.due,
                GROUP_CONCAT(t.tag) as tags
         FROM cards_fts fts
         JOIN cards c ON fts.rowid = c.id
@@ -84,7 +102,7 @@ export class SpacedRepetition {
 			params = [this.userId, query, this.userId];
 		} else {
 			sql = `
-        SELECT c.id, c.instructions, r.next_review_date,
+        SELECT c.id, c.instructions, r.due,
                GROUP_CONCAT(t.tag) as tags
         FROM cards c
         JOIN reviews r ON c.id = r.card_id
@@ -109,14 +127,14 @@ export class SpacedRepetition {
 	/**
 	 * Get cards due for review
 	 */
-	async getDueCards(limit?: number, tags: string[] = []): Promise<Card[]> {
+	async getDueCards(limit?: number, tags: string[] = []): Promise<CardData[]> {
 		let sql = `
-      SELECT c.id, c.instructions, r.next_review_date,
+      SELECT c.id, c.instructions, r.due,
              GROUP_CONCAT(t.tag) as tags
       FROM cards c
       JOIN reviews r ON c.id = r.card_id
       LEFT JOIN tags t ON c.id = t.card_id AND t.user_id = ?
-      WHERE c.user_id = ? AND r.next_review_date <= DATE('now')
+      WHERE c.user_id = ? AND r.due <= datetime('now')
     `;
 		const params: any[] = [this.userId, this.userId];
 
@@ -126,7 +144,7 @@ export class SpacedRepetition {
 			params.push(this.userId, ...tags);
 		}
 
-		sql += " GROUP BY c.id ORDER BY r.next_review_date";
+		sql += " GROUP BY c.id ORDER BY r.due";
 
 		if (limit !== undefined) {
 			sql += " LIMIT ?";
@@ -140,9 +158,9 @@ export class SpacedRepetition {
 	/**
 	 * Get all cards
 	 */
-	async getAllCards(tags: string[] = []): Promise<Card[]> {
+	async getAllCards(tags: string[] = []): Promise<CardData[]> {
 		let sql = `
-      SELECT c.id, c.instructions, r.next_review_date,
+      SELECT c.id, c.instructions, r.due,
              GROUP_CONCAT(t.tag) as tags
       FROM cards c
       JOIN reviews r ON c.id = r.card_id
@@ -164,13 +182,14 @@ export class SpacedRepetition {
 	}
 
 	/**
-	 * Submit a review with difficulty rating (1-5)
+	 * Submit a review with FSRS rating (1-4: Again, Hard, Good, Easy)
 	 */
-	async submitReview(cardId: number, difficulty: number): Promise<ReviewResult> {
-		// Get current review state
+	async submitReview(cardId: number, rating: Grade): Promise<ReviewResult> {
+		// Get current card state from database
 		const review = await this.db
 			.prepare(
-				`SELECT easiness_factor, interval, repetitions
+				`SELECT state, due, stability, difficulty, elapsed_days, scheduled_days,
+         learning_steps, reps, lapses, last_review
          FROM reviews WHERE card_id = ? AND user_id = ?`,
 			)
 			.bind(cardId, this.userId)
@@ -180,38 +199,59 @@ export class SpacedRepetition {
 			throw new Error(`Card ${cardId} not found`);
 		}
 
-		const ef = review.easiness_factor as number;
-		const interval = review.interval as number;
-		const repetitions = review.repetitions as number;
+		// Convert database row to FSRS Card object
+		const card: Card = {
+			state: review.state as State,
+			due: new Date(review.due as string),
+			stability: review.stability as number,
+			difficulty: review.difficulty as number,
+			elapsed_days: review.elapsed_days as number,
+			scheduled_days: review.scheduled_days as number,
+			learning_steps: review.learning_steps as number,
+			reps: review.reps as number,
+			lapses: review.lapses as number,
+			last_review: review.last_review ? new Date(review.last_review as string) : undefined,
+		};
 
-		// Calculate new values using SM-2 algorithm
-		const { newInterval, newEf, newRepetitions } = this.calculateNextReview(
-			repetitions,
-			ef,
-			difficulty,
-			interval,
+		// Schedule the card using FSRS
+		const now = new Date();
+		const recordLogItem: RecordLogItem = this.scheduler.next(card, now, rating);
+		const updatedCard = recordLogItem.card;
+
+		// Calculate interval in days
+		const nextDate = updatedCard.due;
+		const interval = Math.round(
+			(nextDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
 		);
 
-		// Calculate next review date
-		const today = new Date();
-		const nextDate = new Date(today);
-		nextDate.setDate(nextDate.getDate() + newInterval);
-		const nextDateStr = nextDate.toISOString().split("T")[0];
-
-		// Update reviews table
+		// Update reviews table with new FSRS state
 		await this.db
 			.prepare(
 				`UPDATE reviews
-         SET easiness_factor = ?, interval = ?, repetitions = ?,
-             next_review_date = ?, last_reviewed_date = DATE('now')
+         SET state = ?, due = ?, stability = ?, difficulty = ?,
+             elapsed_days = ?, scheduled_days = ?, learning_steps = ?,
+             reps = ?, lapses = ?, last_review = ?
          WHERE card_id = ? AND user_id = ?`,
 			)
-			.bind(newEf, newInterval, newRepetitions, nextDateStr, cardId, this.userId)
+			.bind(
+				updatedCard.state,
+				updatedCard.due.toISOString(),
+				updatedCard.stability,
+				updatedCard.difficulty,
+				updatedCard.elapsed_days,
+				updatedCard.scheduled_days,
+				updatedCard.learning_steps,
+				updatedCard.reps,
+				updatedCard.lapses,
+				updatedCard.last_review ? updatedCard.last_review.toISOString() : null,
+				cardId,
+				this.userId,
+			)
 			.run();
 
 		return {
-			next_review: nextDateStr,
-			interval: newInterval,
+			next_review: nextDate.toISOString().split("T")[0],
+			interval: interval,
 		};
 	}
 
@@ -296,7 +336,7 @@ export class SpacedRepetition {
 				`SELECT COUNT(*) as count
          FROM cards c
          JOIN reviews r ON c.id = r.card_id
-         WHERE c.user_id = ? AND r.next_review_date <= DATE('now')${tagFilter}`,
+         WHERE c.user_id = ? AND r.due <= datetime('now')${tagFilter}`,
 			)
 			.bind(...params)
 			.first();
@@ -321,8 +361,8 @@ export class SpacedRepetition {
 			const tagStatsResult = await this.db
 				.prepare(
 					`SELECT t.tag,
-                COUNT(DISTINCT c.id) as total_cards,
-                SUM(CASE WHEN r.next_review_date <= DATE('now') THEN 1 ELSE 0 END) as due_cards
+               COUNT(DISTINCT c.id) as total_cards,
+               SUM(CASE WHEN r.due <= datetime('now') THEN 1 ELSE 0 END) as due_cards
          FROM tags t
          JOIN cards c ON t.card_id = c.id
          JOIN reviews r ON c.id = r.card_id
@@ -349,20 +389,23 @@ export class SpacedRepetition {
 	/**
 	 * Format a card row from database
 	 */
-	private formatCardRow(row: any): Card {
-		const dueDate = row.next_review_date as string;
-		const today = new Date().toISOString().split("T")[0];
-		const tomorrow = new Date();
+	private formatCardRow(row: any): CardData {
+		const dueDate = new Date(row.due as string);
+		const today = new Date();
+		today.setHours(0, 0, 0, 0);
+		const tomorrow = new Date(today);
 		tomorrow.setDate(tomorrow.getDate() + 1);
-		const tomorrowStr = tomorrow.toISOString().split("T")[0];
 
 		let dueStr: string;
-		if (dueDate === today) {
+		const dueDay = new Date(dueDate);
+		dueDay.setHours(0, 0, 0, 0);
+
+		if (dueDay.getTime() === today.getTime()) {
 			dueStr = "today";
-		} else if (dueDate === tomorrowStr) {
+		} else if (dueDay.getTime() === tomorrow.getTime()) {
 			dueStr = "tomorrow";
 		} else {
-			dueStr = dueDate;
+			dueStr = dueDate.toISOString().split("T")[0];
 		}
 
 		return {
@@ -370,46 +413,6 @@ export class SpacedRepetition {
 			instructions: row.instructions as string,
 			tags: row.tags ? (row.tags as string).split(",") : [],
 			due: dueStr,
-		};
-	}
-
-	/**
-	 * Calculate next review using SM-2 algorithm
-	 */
-	private calculateNextReview(
-		repetitions: number,
-		easinessFactor: number,
-		difficulty: number,
-		previousInterval: number = 0,
-	): { newInterval: number; newEf: number; newRepetitions: number } {
-		// Reset if failed (difficulty < 3)
-		if (difficulty < 3) {
-			return {
-				newInterval: 1,
-				newEf: easinessFactor,
-				newRepetitions: 0,
-			};
-		}
-
-		// Calculate new EF
-		let newEf =
-			easinessFactor + (0.1 - (5 - difficulty) * (0.08 + (5 - difficulty) * 0.02));
-		newEf = Math.max(1.3, newEf); // Minimum EF of 1.3
-
-		// Calculate interval
-		let interval: number;
-		if (repetitions === 0) {
-			interval = 1;
-		} else if (repetitions === 1) {
-			interval = 6;
-		} else {
-			interval = Math.round(previousInterval * newEf);
-		}
-
-		return {
-			newInterval: interval,
-			newEf: newEf,
-			newRepetitions: repetitions + 1,
 		};
 	}
 }

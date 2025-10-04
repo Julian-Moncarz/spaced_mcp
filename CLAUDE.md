@@ -61,7 +61,7 @@ npx @modelcontextprotocol/inspector
 Main entry point. Defines 8 MCP tools (`add_card`, `get_due_cards`, `search_cards`, `get_all_cards`, `review_card`, `edit_card`, `delete_card`, `get_stats`). Each tool creates a `SpacedRepetition` instance scoped to `this.props.login` (GitHub username from OAuth).
 
 **[src/spaced-core.ts](src/spaced-core.ts)**
-Core spaced repetition logic. Implements SM-2 algorithm for review scheduling. All database queries filter by `user_id` for data isolation. Uses D1 SQLite with FTS5 for full-text search.
+Core spaced repetition logic. Uses FSRS algorithm (via ts-fsrs package) for review scheduling. All database queries filter by `user_id` for data isolation. Uses D1 SQLite with FTS5 for full-text search.
 
 **[src/github-handler.ts](src/github-handler.ts)**
 GitHub OAuth handler. Exchanges OAuth code for access token, fetches user info from GitHub API, and stores user context (`login`, `name`, `email`, `accessToken`) encrypted in the MCP session.
@@ -79,17 +79,19 @@ Cloudflare Workers configuration. Defines bindings for D1 database (`DB`), KV na
 
 - **Cards**: Store learning instructions (not static Q&A)
 - **Tags**: Many-to-many relationship with cards
-- **Reviews**: One per card, stores SM-2 state (easiness_factor, interval, repetitions, next_review_date)
+- **Reviews**: One per card, stores FSRS state (state, due, stability, difficulty, elapsed_days, scheduled_days, learning_steps, reps, lapses, last_review)
 - **User isolation**: All tables have `user_id TEXT NOT NULL` column
 
-### SM-2 Algorithm
+### FSRS Algorithm
 
-Located in [src/spaced-core.ts](src/spaced-core.ts#L379-L414). Key rules:
-- Difficulty < 3: Reset to interval=1, repetitions=0
-- First review: interval=1 day
-- Second review: interval=6 days
-- Subsequent: interval = previous_interval × easiness_factor
-- Easiness factor adjusts based on difficulty (1-5)
+Uses the ts-fsrs package (https://github.com/open-spaced-repetition/ts-fsrs). FSRS is a modern, machine learning-based spaced repetition algorithm that's more accurate than SM-2.
+
+Key features:
+- **4 ratings**: Again (1), Hard (2), Good (3), Easy (4)
+- **Card states**: New, Learning, Review, Relearning
+- **Memory parameters**: Stability (how well retained) and Difficulty (intrinsic complexity)
+- **Adaptive scheduling**: Uses retrievability and forgetting curves
+- Review scheduling handled by `scheduler.next(card, now, rating)` in [src/spaced-core.ts](src/spaced-core.ts)
 
 ## Environment Setup
 

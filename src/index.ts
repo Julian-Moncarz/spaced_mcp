@@ -154,19 +154,19 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 		// Tool 5: Review a card
 		this.server.tool(
 			"review_card",
-			"Submit a review for a card with difficulty rating (1=failed, 5=easy)",
+			"Submit a review for a card with FSRS rating (1=Again, 2=Hard, 3=Good, 4=Easy)",
 			{
 				card_id: z.number().describe("The ID of the card to review"),
-				difficulty: z
+				rating: z
 					.number()
 					.min(1)
-					.max(5)
-					.describe("Difficulty rating: 1=failed, 2=hard, 3=medium, 4=good, 5=easy"),
+					.max(4)
+					.describe("FSRS rating: 1=Again (forgot), 2=Hard, 3=Good, 4=Easy"),
 			},
-			async ({ card_id, difficulty }) => {
+			async ({ card_id, rating }) => {
 				const db = getUserDb();
 				try {
-					const result = await db.submitReview(card_id, difficulty);
+					const result = await db.submitReview(card_id, rating);
 					const today = new Date().toISOString().split("T")[0];
 					const nextDate = new Date(result.next_review);
 					const daysDiff = Math.round(
