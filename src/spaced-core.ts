@@ -134,7 +134,7 @@ export class SpacedRepetition {
       FROM cards c
       JOIN reviews r ON c.id = r.card_id
       LEFT JOIN tags t ON c.id = t.card_id AND t.user_id = ?
-      WHERE c.user_id = ? AND r.due <= datetime('now')
+      WHERE c.user_id = ? AND datetime(r.due) <= datetime('now')
     `;
 		const params: any[] = [this.userId, this.userId];
 
@@ -336,7 +336,7 @@ export class SpacedRepetition {
 				`SELECT COUNT(*) as count
          FROM cards c
          JOIN reviews r ON c.id = r.card_id
-         WHERE c.user_id = ? AND r.due <= datetime('now')${tagFilter}`,
+         WHERE c.user_id = ? AND datetime(r.due) <= datetime('now')${tagFilter}`,
 			)
 			.bind(...params)
 			.first();
@@ -362,7 +362,7 @@ export class SpacedRepetition {
 				.prepare(
 					`SELECT t.tag,
                COUNT(DISTINCT c.id) as total_cards,
-               SUM(CASE WHEN r.due <= datetime('now') THEN 1 ELSE 0 END) as due_cards
+               SUM(CASE WHEN datetime(r.due) <= datetime('now') THEN 1 ELSE 0 END) as due_cards
          FROM tags t
          JOIN cards c ON t.card_id = c.id
          JOIN reviews r ON c.id = r.card_id

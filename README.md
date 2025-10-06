@@ -25,18 +25,24 @@ Claude: Card 1 reviewed. Next review in 6 days.
 ## Features
 
 - ✅ **8 MCP tools** for card management (add, search, review, edit, delete, stats)
-- ✅ **GitHub OAuth** authentication with user isolation
+- ✅ **Google OAuth** authentication with user isolation
 - ✅ **Cloudflare D1** SQLite database (free tier)
 - ✅ **FSRS algorithm** for optimal review scheduling (modern, ML-based)
 - ✅ **Full-text search** with FTS5
 - ✅ **Works everywhere**: Claude web, Claude Desktop, Claude Code, Cursor, Windsurf
-- ✅ **Private & secure**: Your cards are isolated to your GitHub account
+- ✅ **Private & secure**: Your cards are isolated to your Google account
 
 ## Quick Start
 
-**1. Deploy (5 minutes):**
+**Option 1: Use the public server (fastest):**
+```
+Add this URL to your MCP client:
+https://spaced-mcp-server.spaced-repetition-mcp.workers.dev/mcp
+```
+
+**Option 2: Deploy your own (5 minutes):**
 ```bash
-git clone <this-repo>
+git clone https://github.com/julianmoncarz/spaced-mcp-server
 cd spaced-mcp-server
 npm install
 ```
@@ -45,8 +51,8 @@ Follow [SETUP.md](SETUP.md) for complete deployment instructions.
 
 **2. Connect to Claude:**
 - Go to https://claude.ai/settings/integrations
-- Add custom connector: `https://your-worker.workers.dev/mcp`
-- Authorize with GitHub
+- Add custom connector: `https://spaced-mcp-server.spaced-repetition-mcp.workers.dev/mcp`
+- Click "Connect" → Approve access → Sign in with Google
 
 **3. Start using:**
 ```
@@ -75,7 +81,7 @@ Follow [SETUP.md](SETUP.md) for complete deployment instructions.
                   ▼
 ┌─────────────────────────────────────────────┐
 │  Cloudflare Worker (Your Server)            │
-│  • GitHub OAuth                             │
+│  • Google OAuth                             │
 │  • 8 MCP Tools                              │
 │  • User isolation                           │
 └─────────────────┬───────────────────────────┘
@@ -85,7 +91,7 @@ Follow [SETUP.md](SETUP.md) for complete deployment instructions.
 │  Cloudflare D1 (SQLite)                     │
 │  • Cards with FTS5 search                   │
 │  • Tags                                     │
-│  • Review history & SM-2 state              │
+│  • Review history & FSRS state              │
 └─────────────────────────────────────────────┘
 ```
 
@@ -125,7 +131,7 @@ Claude reads these instructions and generates fresh, personalized practice every
 
 - **Runtime**: Cloudflare Workers (serverless)
 - **Database**: Cloudflare D1 (SQLite with FTS5)
-- **Auth**: GitHub OAuth via workers-oauth-provider
+- **Auth**: Google OAuth via workers-oauth-provider
 - **Protocol**: MCP (Model Context Protocol)
 - **Language**: TypeScript
 - **Algorithm**: FSRS (Free Spaced Repetition Scheduler) via ts-fsrs

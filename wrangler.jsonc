@@ -17,10 +17,10 @@
 	/**
 		 * Note: Use secrets to store sensitive data.
 		 * https://developers.cloudflare.com/workers/configuration/secrets/
-		 * 
+		 *
 		 * Commands to set secrets:
-		 * npx wrangler secret put GITHUB_CLIENT_ID
-		 * npx wrangler secret put GITHUB_CLIENT_SECRET
+		 * npx wrangler secret put GOOGLE_CLIENT_ID
+		 * npx wrangler secret put GOOGLE_CLIENT_SECRET
 		 * npx wrangler secret put COOKIE_ENCRYPTION_KEY
 		 */
 	"migrations": [

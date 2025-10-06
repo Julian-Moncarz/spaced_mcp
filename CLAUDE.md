@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a remote MCP (Model Context Protocol) server that provides spaced repetition tools to AI assistants. It runs on Cloudflare Workers with a D1 SQLite database and GitHub OAuth for user authentication. Each user's spaced repetition cards are isolated by their GitHub login.
+This is a remote MCP (Model Context Protocol) server that provides spaced repetition tools to AI assistants. It runs on Cloudflare Workers with a D1 SQLite database and Google OAuth for user authentication. Each user's spaced repetition cards are isolated by their Google email.
 
 The core concept: Instead of static flashcards, this stores **instructions** that Claude uses to generate fresh, personalized practice problems on demand.
 
@@ -32,8 +32,8 @@ npx wrangler d1 create spaced-repetition-db
 
 ### Secrets Management
 ```bash
-npx wrangler secret put GITHUB_CLIENT_ID
-npx wrangler secret put GITHUB_CLIENT_SECRET
+npx wrangler secret put GOOGLE_CLIENT_ID
+npx wrangler secret put GOOGLE_CLIENT_SECRET
 npx wrangler secret put COOKIE_ENCRYPTION_KEY
 ```
 
@@ -48,23 +48,23 @@ npx @modelcontextprotocol/inspector
 
 ### Request Flow
 1. MCP client (Claude, Cursor, etc) connects via OAuth + MCP protocol
-2. GitHub OAuth authenticates user → `user_id` = GitHub login
+2. Google OAuth authenticates user → `user_id` = Google email
 3. Request hits Cloudflare Worker ([src/index.ts](src/index.ts))
 4. Worker calls Durable Object ([MyMCP](src/index.ts) class extends `McpAgent`)
-5. Durable Object has `this.props.login` (GitHub username) from OAuth
+5. Durable Object has `this.props.login` (Google email) from OAuth
 6. [SpacedRepetition](src/spaced-core.ts) class queries D1 with `user_id` filter
 7. Response sent back through MCP protocol
 
 ### Key Components
 
 **[src/index.ts](src/index.ts)**
-Main entry point. Defines 8 MCP tools (`add_card`, `get_due_cards`, `search_cards`, `get_all_cards`, `review_card`, `edit_card`, `delete_card`, `get_stats`). Each tool creates a `SpacedRepetition` instance scoped to `this.props.login` (GitHub username from OAuth).
+Main entry point. Defines 8 MCP tools (`add_card`, `get_due_cards`, `search_cards`, `get_all_cards`, `review_card`, `edit_card`, `delete_card`, `get_stats`). Each tool creates a `SpacedRepetition` instance scoped to `this.props.login` (Google email from OAuth).
 
 **[src/spaced-core.ts](src/spaced-core.ts)**
 Core spaced repetition logic. Uses FSRS algorithm (via ts-fsrs package) for review scheduling. All database queries filter by `user_id` for data isolation. Uses D1 SQLite with FTS5 for full-text search.
 
-**[src/github-handler.ts](src/github-handler.ts)**
-GitHub OAuth handler. Exchanges OAuth code for access token, fetches user info from GitHub API, and stores user context (`login`, `name`, `email`, `accessToken`) encrypted in the MCP session.
+**[src/google-handler.ts](src/google-handler.ts)**
+Google OAuth handler. Exchanges OAuth code for access token, fetches user info from Google API, and stores user context (`login`, `name`, `email`, `accessToken`) encrypted in the MCP session.
 
 **[src/workers-oauth-utils.ts](src/workers-oauth-utils.ts)**
 OAuth utilities for Cloudflare Workers OAuth Provider integration.
@@ -97,23 +97,27 @@ Key features:
 
 ### Production
 Requires 3 secrets (set via `wrangler secret put`):
-- `GITHUB_CLIENT_ID` - From GitHub OAuth app
-- `GITHUB_CLIENT_SECRET` - From GitHub OAuth app
-- `COOKIE_ENCRYPTION_KEY` - Generate with `openssl rand -hex 32`
+- `GOOGLE_CLIENT_ID` - From Google Cloud Console OAuth app (✅ configured)
+- `GOOGLE_CLIENT_SECRET` - From Google Cloud Console OAuth app (✅ configured)
+- `COOKIE_ENCRYPTION_KEY` - Generate with `openssl rand -hex 32` (✅ configured)
 
-Requires D1 database and KV namespace (IDs in [wrangler.jsonc](wrangler.jsonc)):
-- Update `d1_databases[0].database_id` after creating D1 database
-- Update `kv_namespaces[0].id` after creating KV namespace
+Current production configuration:
+- **Worker URL**: `https://spaced-mcp-server.spaced-repetition-mcp.workers.dev`
+- **MCP Endpoint**: `https://spaced-mcp-server.spaced-repetition-mcp.workers.dev/mcp`
+- **OAuth Callback**: `https://spaced-mcp-server.spaced-repetition-mcp.workers.dev/callback`
+- **D1 Database ID**: `db83048c-7653-4c47-9b5d-77cddf7d3960`
+- **KV Namespace ID**: `4bfdeef7e6494d77a3d04045275ff214`
+- **Google OAuth Client**: Configured with redirect URI for production callback
 
 ### Local Development
 Create `.dev.vars` file:
 ```bash
-GITHUB_CLIENT_ID=dev_client_id
-GITHUB_CLIENT_SECRET=dev_client_secret
+GOOGLE_CLIENT_ID=dev_client_id
+GOOGLE_CLIENT_SECRET=dev_client_secret
 COOKIE_ENCRYPTION_KEY=any_random_string
 ```
 
-Use separate GitHub OAuth app with callback `http://localhost:8788/callback`.
+Use separate Google OAuth app with callback `http://localhost:8788/callback`.
 
 ## MCP Protocol Support
 
@@ -143,7 +147,7 @@ All database operations should use the `getUserDb()` helper to ensure user isola
 
 ## Common Gotchas
 
-1. **User Isolation**: Always use `this.props.login` from OAuth context as `user_id`. Never hardcode or skip this filter.
+1. **User Isolation**: Always use `this.props.login` (Google email) from OAuth context as `user_id`. Never hardcode or skip this filter.
 
 2. **D1 Batching**: Use `this.db.batch([...queries])` for multiple inserts (e.g., tags) to reduce round trips.
 
@@ -151,7 +155,7 @@ All database operations should use the `getUserDb()` helper to ensure user isola
 
 4. **FTS Triggers**: Modifying cards table schema requires updating FTS triggers in [schema.sql](schema.sql#L44-L57).
 
-5. **OAuth Context**: `this.props` is populated by [src/github-handler.ts](src/github-handler.ts) after successful OAuth. Contains `{ login, name, email, accessToken }`.
+5. **OAuth Context**: `this.props` is populated by [src/google-handler.ts](src/google-handler.ts) after successful OAuth. Contains `{ login, name, email, accessToken }`.
 
 6. **Type Safety**: Run `npm run type-check` before deployment. Worker bindings defined in [worker-configuration.d.ts](worker-configuration.d.ts) (auto-generated).
 

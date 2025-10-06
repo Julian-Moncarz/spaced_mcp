@@ -1,3 +1,11 @@
-GITHUB_CLIENT_ID=<your github client id>
-GITHUB_CLIENT_SECRET=<your github client secret>
-COOKIE_ENCRYPTION_KEY=<your cookie cookie encryption key>
+# Local development environment variables
+# Copy this file to .dev.vars and fill in your values
+
+# Google OAuth credentials for LOCAL development
+# Create a separate OAuth app with redirect URI: http://localhost:8788/callback
+GOOGLE_CLIENT_ID=your_dev_client_id_here
+GOOGLE_CLIENT_SECRET=your_dev_client_secret_here
+
+# Cookie encryption key (any random string for local dev)
+# For production, use: openssl rand -hex 32
+COOKIE_ENCRYPTION_KEY=dev_encryption_key_any_random_string

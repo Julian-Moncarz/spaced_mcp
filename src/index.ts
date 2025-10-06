@@ -2,7 +2,7 @@ import OAuthProvider from "@cloudflare/workers-oauth-provider";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { McpAgent } from "agents/mcp";
 import { z } from "zod";
-import { GitHubHandler } from "./github-handler";
+import { GoogleHandler } from "./google-handler";
 import { SpacedRepetition } from "./spaced-core";
 
 // Context from the auth process, encrypted & stored in the auth token
@@ -21,7 +21,7 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 	});
 
 	async init() {
-		// Initialize SpacedRepetition instance with user's GitHub login as user_id
+		// Initialize SpacedRepetition instance with user's Google email as user_id
 		const getUserDb = () => new SpacedRepetition(this.env.DB, this.props!.login);
 
 		// Tool 1: Add a new card
@@ -304,6 +304,6 @@ export default new OAuthProvider({
 	},
 	authorizeEndpoint: "/authorize",
 	clientRegistrationEndpoint: "/register",
-	defaultHandler: GitHubHandler as any,
+	defaultHandler: GoogleHandler as any,
 	tokenEndpoint: "/token",
 });

@@ -11,8 +11,8 @@ declare namespace Cloudflare {
 		MCP_OBJECT: DurableObjectNamespace<import("./src/index").MyMCP>;
 		AI: Ai;
 		DB: D1Database;
-		GITHUB_CLIENT_ID: string;
-		GITHUB_CLIENT_SECRET: string;
+		GOOGLE_CLIENT_ID: string;
+		GOOGLE_CLIENT_SECRET: string;
 		COOKIE_ENCRYPTION_KEY: string;
 	}
 }
