@@ -1,5 +1,9 @@
 # Spaced Repetition MCP Server
 
+[![First-time contributors welcome](https://img.shields.io/badge/first--time--contributors-welcome-brightgreen.svg)](CONTRIBUTING.md)
+
+> **New to the project?** Check out [ARCHITECTURE.md](ARCHITECTURE.md) for a deep dive, [GLOSSARY.md](GLOSSARY.md) for terminology, and [CONTRIBUTING.md](CONTRIBUTING.md) for development workflow!
+
 A remote [Model Context Protocol](https://modelcontextprotocol.io) server that brings spaced repetition to Claude, Claude Code, Cursor, and other MCP clients.
 
 ## What It Does
@@ -70,6 +74,8 @@ Follow [SETUP.md](SETUP.md) for complete deployment instructions.
 
 ## Architecture
 
+### High-Level Flow
+
 ```
 ┌─────────────────────────────────────────────┐
 │  MCP Clients                                │
@@ -94,6 +100,27 @@ Follow [SETUP.md](SETUP.md) for complete deployment instructions.
 │  • Review history & FSRS state              │
 └─────────────────────────────────────────────┘
 ```
+
+### Request Flow with User Isolation
+
+```
+┌─────────┐      ┌──────────────┐      ┌──────────────┐      ┌──────────┐
+│ Claude  │─────▶│ Google OAuth │─────▶│ Durable      │─────▶│ D1       │
+│ Client  │      │ (authenticates│      │ Object       │      │ Database │
+│         │      │  user)        │      │ (MyMCP)      │      │          │
+│         │      │               │      │              │      │ WHERE    │
+│         │      │ Returns:      │      │ this.props = │      │ user_id= │
+│         │      │ email         │      │ { login:     │      │ email    │
+│         │◀─────│               │◀─────│   email }    │◀─────│          │
+└─────────┘      └──────────────┘      └──────────────┘      └──────────┘
+                                             │
+                                             ▼
+                                     User isolation boundary:
+                                     this.props.login → user_id
+                                     (Google email)
+```
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed walkthrough of the request lifecycle.
 
 ## MCP Tools
 
@@ -157,6 +184,35 @@ npx wrangler dev
 npx @modelcontextprotocol/inspector
 # Enter: http://localhost:8788/sse
 ```
+
+## Common Gotchas
+
+### For Contributors
+
+**1. Always filter by `user_id` in queries**
+```typescript
+// ❌ Wrong - no user isolation
+SELECT * FROM cards WHERE id = ?
+
+// ✅ Correct - filters by user
+SELECT * FROM cards WHERE id = ? AND user_id = ?
+```
+
+**2. Modifying cards table schema?**
+Don't forget to update FTS triggers in `schema.sql`! The `cards_fts` virtual table must stay in sync.
+
+**3. Testing OAuth locally?**
+You need a separate Google OAuth app with callback `http://localhost:8788/callback`. See [SETUP.md](SETUP.md).
+
+**4. Changes not showing up?**
+- Local dev: `wrangler dev` auto-reloads on file changes
+- Production: Run `npx wrangler deploy` to deploy changes
+
+**5. D1 migrations failing?**
+SQLite in D1 has limitations - you can't drop columns. Use `ALTER TABLE ADD COLUMN` for additive changes only.
+
+**6. Type errors after updating schema?**
+Run `npm run cf-typegen` to regenerate TypeScript types from `wrangler.jsonc`.
 
 ## Credits
 

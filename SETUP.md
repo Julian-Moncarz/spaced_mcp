@@ -132,7 +132,7 @@ npx wrangler secret put COOKIE_ENCRYPTION_KEY
 
 ## Part 3: Connect MCP Clients
 
-### Claude.ai (Web)
+### Claude.ai (Web) ✅ Native Support
 
 1. Go to https://claude.ai/settings/integrations
 2. Click **Add custom connector**
@@ -145,9 +145,43 @@ npx wrangler secret put COOKIE_ENCRYPTION_KEY
 6. Sign in with Google
 7. Done! Claude now has access to spaced repetition tools
 
-### Claude Desktop
+### Claude Code ✅ Native Support
 
-Add to your `claude_desktop_config.json`:
+Claude Code has native support for remote MCP servers with OAuth authentication.
+
+**Method 1: CLI (Recommended)**
+
+```bash
+# Add the server
+claude mcp add --transport http spaced-repetition https://spaced-mcp-server.your-subdomain.workers.dev/mcp
+
+# Authenticate (opens browser for Google OAuth)
+# In Claude Code, run: /mcp
+```
+
+**Method 2: Configuration File**
+
+If your version doesn't support the CLI yet, add to your MCP configuration:
+
+```json
+{
+  "mcpServers": {
+    "spaced-repetition": {
+      "type": "http",
+      "url": "https://spaced-mcp-server.your-subdomain.workers.dev/mcp"
+    }
+  }
+}
+```
+
+**Scopes:**
+- `--scope local` (default): Available only to you in current project
+- `--scope project`: Shared with team via `.mcp.json` file
+- `--scope user`: Available across multiple projects
+
+### Claude Desktop ⚠️ Requires mcp-remote
+
+Claude Desktop currently requires the `mcp-remote` bridge tool to connect to remote servers.
 
 **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
 **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
@@ -156,43 +190,81 @@ Add to your `claude_desktop_config.json`:
 {
   "mcpServers": {
     "spaced-repetition": {
-      "url": "https://spaced-mcp-server.your-subdomain.workers.dev/mcp"
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://spaced-mcp-server.your-subdomain.workers.dev/sse"
+      ]
     }
   }
 }
 ```
+
+**How it works:**
+- `mcp-remote` acts as a local bridge between Claude Desktop (stdio) and your remote server (HTTP/SSE)
+- Handles OAuth authentication automatically
+- Opens browser for Google sign-in on first use
+- Stores credentials in `~/.mcp-auth`
 
 Restart Claude Desktop and connect via the integrations menu.
 
-### Cursor
+### Cursor ⚠️ Requires mcp-remote
 
-Add to `.cursor/mcp.json` in your home directory:
+Cursor works best with the `mcp-remote` bridge tool for remote servers.
 
-```json
-{
-  "mcpServers": {
-    "spaced-repetition": {
-      "url": "https://spaced-mcp-server.your-subdomain.workers.dev/mcp"
-    }
-  }
-}
-```
-
-Restart Cursor and authorize via Settings > MCP.
-
-### Windsurf
-
-Add to Windsurf's MCP settings (similar to Cursor):
+Add to `~/.cursor/mcp.json`:
 
 ```json
 {
   "mcpServers": {
     "spaced-repetition": {
-      "url": "https://spaced-mcp-server.your-subdomain.workers.dev/mcp"
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://spaced-mcp-server.your-subdomain.workers.dev/sse"
+      ]
     }
   }
 }
 ```
+
+Restart Cursor. On first use, `mcp-remote` will open your browser to authenticate with Google.
+
+**Note**: Some newer versions of Cursor may support direct HTTP connections. If you want to try native support:
+
+```json
+{
+  "mcpServers": {
+    "spaced-repetition": {
+      "type": "sse",
+      "url": "https://spaced-mcp-server.your-subdomain.workers.dev/sse"
+    }
+  }
+}
+```
+
+### Windsurf ⚠️ Requires mcp-remote
+
+Add to Windsurf's MCP configuration:
+
+```json
+{
+  "mcpServers": {
+    "spaced-repetition": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://spaced-mcp-server.your-subdomain.workers.dev/sse"
+      ]
+    }
+  }
+}
+```
+
+Restart Windsurf. On first use, authenticate via the browser when prompted.
 
 ## Part 4: Test Your Setup
 
@@ -264,6 +336,40 @@ Complete the OAuth flow, then test all 8 MCP tools.
 
 - Clear browser cookies and reconnect
 - Check that your worker is deployed: `npx wrangler deployments list`
+
+### mcp-remote Connection Issues
+
+If you're using `mcp-remote` with Cursor/Claude Desktop and having issues:
+
+**Clear cached credentials:**
+```bash
+rm -rf ~/.mcp-auth
+```
+
+Then restart your MCP client and re-authenticate.
+
+**Test connection manually:**
+```bash
+npx mcp-remote https://spaced-mcp-server.your-subdomain.workers.dev/sse
+```
+
+This will open your browser for OAuth. If successful, you should see connection logs.
+
+**Check if mcp-remote is installed:**
+```bash
+npm ls -g mcp-remote
+```
+
+If not found, the `npx` command will automatically download it on first use.
+
+### Claude Code Native Connection Issues
+
+If direct HTTP connection fails:
+
+1. **Check Claude Code version** - Native remote support requires June 2025+ version
+2. **Try the mcp-remote fallback** - Use the same config as Claude Desktop
+3. **Verify URL** - Use `/mcp` endpoint (not `/sse`)
+4. **Check authentication** - Run `/mcp` command to trigger OAuth flow
 
 ### Database Errors
 

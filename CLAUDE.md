@@ -46,7 +46,7 @@ npx @modelcontextprotocol/inspector
 
 ## Architecture
 
-### Request Flow
+### Request Flow Overview
 1. MCP client (Claude, Cursor, etc) connects via OAuth + MCP protocol
 2. Google OAuth authenticates user → `user_id` = Google email
 3. Request hits Cloudflare Worker ([src/index.ts](src/index.ts))
@@ -55,10 +55,73 @@ npx @modelcontextprotocol/inspector
 6. [SpacedRepetition](src/spaced-core.ts) class queries D1 with `user_id` filter
 7. Response sent back through MCP protocol
 
+### Detailed Example: add_card Tool Call
+
+Here's exactly what happens when Claude calls `add_card`:
+
+**1. MCP Client → Worker**
+```
+Claude calls tool:
+  tool: "add_card"
+  args: { instructions: "Practice binary search", tags: "algorithms" }
+
+Request sent:
+  POST https://spaced-mcp-server.workers.dev/mcp
+  Headers: { Authorization: "Bearer <encrypted_session_token>" }
+```
+
+**2. OAuth Provider → Session Validation**
+```
+OAuth Provider decrypts session token:
+  { login: "user@gmail.com", name: "John Doe", ... }
+
+Passes to Durable Object as this.props
+```
+
+**3. Durable Object (MyMCP) → Tool Handler**
+```typescript
+// src/index.ts:40
+const getUserDb = () => new SpacedRepetition(this.env.DB, this.props.login);
+//                                                          ↑
+//                                                  "user@gmail.com"
+
+const db = getUserDb(); // Creates instance with user_id = "user@gmail.com"
+const tagArray = ["algorithms"];
+const cardId = await db.addCard("Practice binary search", tagArray);
+```
+
+**4. SpacedRepetition → Database Query**
+```typescript
+// src/spaced-core.ts:42-45
+await this.db
+  .prepare("INSERT INTO cards (user_id, instructions) VALUES (?, ?)")
+  .bind(this.userId, instructions)
+  //     ↑
+  //     "user@gmail.com" from constructor
+  .run();
+
+// Result: Card inserted with user_id = "user@gmail.com"
+// Returns: card ID = 42
+```
+
+**5. Response Back to Claude**
+```
+Tool handler returns:
+  { content: [{ text: "Created card 42", type: "text" }] }
+
+MCP protocol sends to Claude:
+  Response with text: "Created card 42"
+
+Claude displays to user:
+  "Created card 42"
+```
+
+**Key Insight:** The `user_id` flows from OAuth → `this.props.login` → `SpacedRepetition.userId` → SQL `WHERE user_id = ?`. This ensures every query is automatically isolated to the authenticated user!
+
 ### Key Components
 
 **[src/index.ts](src/index.ts)**
-Main entry point. Defines 8 MCP tools (`add_card`, `get_due_cards`, `search_cards`, `get_all_cards`, `review_card`, `edit_card`, `delete_card`, `get_stats`). Each tool creates a `SpacedRepetition` instance scoped to `this.props.login` (Google email from OAuth).
+Main entry point. Defines 9 MCP tools (`add_card`, `get_due_cards`, `search_cards`, `get_all_cards`, `review_card`, `undo_review`, `edit_card`, `delete_card`, `get_stats`). Each tool creates a `SpacedRepetition` instance scoped to `this.props.login` (Google email from OAuth).
 
 **[src/spaced-core.ts](src/spaced-core.ts)**
 Core spaced repetition logic. Uses FSRS algorithm (via ts-fsrs package) for review scheduling. All database queries filter by `user_id` for data isolation. Uses D1 SQLite with FTS5 for full-text search.
@@ -70,7 +133,7 @@ Google OAuth handler. Exchanges OAuth code for access token, fetches user info f
 OAuth utilities for Cloudflare Workers OAuth Provider integration.
 
 **[schema.sql](schema.sql)**
-Database schema with 3 main tables (`cards`, `tags`, `reviews`) plus `cards_fts` virtual table for full-text search. Triggers keep FTS index synced. All tables have `user_id` column for multi-tenancy.
+Database schema with 4 main tables (`cards`, `tags`, `reviews`, `review_history`) plus `cards_fts` virtual table for full-text search. Triggers keep FTS index synced. All tables have `user_id` column for multi-tenancy.
 
 **[wrangler.jsonc](wrangler.jsonc)**
 Cloudflare Workers configuration. Defines bindings for D1 database (`DB`), KV namespace (`OAUTH_KV`), and AI inference (`AI`). Uses Durable Objects for stateful MCP sessions.
@@ -80,6 +143,7 @@ Cloudflare Workers configuration. Defines bindings for D1 database (`DB`), KV na
 - **Cards**: Store learning instructions (not static Q&A)
 - **Tags**: Many-to-many relationship with cards
 - **Reviews**: One per card, stores FSRS state (state, due, stability, difficulty, elapsed_days, scheduled_days, learning_steps, reps, lapses, last_review)
+- **Review History**: Stores snapshots of review state before each review for undo functionality
 - **User isolation**: All tables have `user_id TEXT NOT NULL` column
 
 ### FSRS Algorithm
