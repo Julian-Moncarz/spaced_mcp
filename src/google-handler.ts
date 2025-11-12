@@ -110,7 +110,15 @@ app.get("/callback", async (c) => {
 		picture: string;
 	};
 
-	const { email, name } = userInfo;
+	const { email, name, verified_email } = userInfo;
+
+	// SECURITY: Only accept verified email addresses to prevent account takeover
+	if (!verified_email) {
+		return c.text(
+			"Email address must be verified with Google. Please verify your email and try again.",
+			403,
+		);
+	}
 
 	// Return back to the MCP client a new token
 	const { redirectTo } = await c.env.OAUTH_PROVIDER.completeAuthorization({
