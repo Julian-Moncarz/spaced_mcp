@@ -28,7 +28,6 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 			{
 				src: FLASHCARD_ICON,
 				mimeType: "image/png",
-				sizes: "360x360",
 			},
 		],
 	});

@@ -1,160 +1,57 @@
 # Spaced Repetition MCP Server
 
-[![First-time contributors welcome](https://img.shields.io/badge/first--time--contributors-welcome-brightgreen.svg)](CONTRIBUTING.md)
-
-> **New to the project?** Check out [ARCHITECTURE.md](ARCHITECTURE.md) for a deep dive, [GLOSSARY.md](GLOSSARY.md) for terminology, and [CONTRIBUTING.md](CONTRIBUTING.md) for development workflow!
-
-A remote [Model Context Protocol](https://modelcontextprotocol.io) server that brings spaced repetition to Claude, Claude Code, Cursor, and other MCP clients.
-
-## What It Does
-
-Turns your AI assistants into personalized tutors with spaced repetition. Instead of static flashcards, Claude generates fresh practice problems based on your stored instructions.
-
-**Example conversation:**
-```
-You: "Add a card to help me practice Python decorators"
-Claude: Created card 1
-
-You: "What's due today?"
-Claude: Card 1: Practice implementing decorators... Due: today
-
-You: "Give me a decorator problem"
-Claude: [generates custom practice problem]
-[You work through it together]
-
-You: "That was medium difficulty, rate it 3"
-Claude: Card 1 reviewed. Next review in 6 days.
-```
-
-## Features
-
-- ✅ **8 MCP tools** for card management (add, search, review, edit, delete, stats)
-- ✅ **Google OAuth** authentication with user isolation
-- ✅ **Cloudflare D1** SQLite database (free tier)
-- ✅ **FSRS algorithm** for optimal review scheduling (modern, ML-based)
-- ✅ **Full-text search** with FTS5
-- ✅ **Works everywhere**: Claude web, Claude Desktop, Claude Code, Cursor, Windsurf
-- ✅ **Private & secure**: Your cards are isolated to your Google account
+A remote [Model Context Protocol](https://modelcontextprotocol.io) server that provides spaced repetition tool to Claude, Claude Code, Cursor, Amp and other MCP clients (including ChatGPT if you turn on developer mode I think).
 
 ## Quick Start
 
-**Option 1: Use the public server (fastest):**
 ```
 Add this URL to your MCP client:
 https://spaced-mcp-server.spaced-repetition-mcp.workers.dev/mcp
 ```
 
-**Option 2: Deploy your own (5 minutes):**
-```bash
-git clone https://github.com/julianmoncarz/spaced-mcp-server
-cd spaced-mcp-server
-npm install
-```
-
-Follow [SETUP.md](SETUP.md) for complete deployment instructions.
-
-**2. Connect to Claude:**
-- Go to https://claude.ai/settings/integrations
-- Add custom connector: `https://spaced-mcp-server.spaced-repetition-mcp.workers.dev/mcp`
-- Click "Connect" → Approve access → Sign in with Google
-
-**3. Start using:**
-```
-"Add a card about binary search trees"
-"What cards are due?"
-"Give me a practice problem"
-```
-
-## Documentation
-
-- **[SETUP.md](SETUP.md)** - Complete setup guide for all MCP clients
-- **[schema.sql](schema.sql)** - Database schema
-- **[src/spaced-core.ts](src/spaced-core.ts)** - Core spaced repetition logic
-- **[src/index.ts](src/index.ts)** - MCP tool definitions
-
-## Architecture
-
-### High-Level Flow
-
-```
-┌─────────────────────────────────────────────┐
-│  MCP Clients                                │
-│  • Claude (web, desktop, code)              │
-│  • Cursor                                   │
-│  • Windsurf                                 │
-└─────────────────┬───────────────────────────┘
-                  │ OAuth + MCP Protocol
-                  ▼
-┌─────────────────────────────────────────────┐
-│  Cloudflare Worker (Your Server)            │
-│  • Google OAuth                             │
-│  • 8 MCP Tools                              │
-│  • User isolation                           │
-└─────────────────┬───────────────────────────┘
-                  │
-                  ▼
-┌─────────────────────────────────────────────┐
-│  Cloudflare D1 (SQLite)                     │
-│  • Cards with FTS5 search                   │
-│  • Tags                                     │
-│  • Review history & FSRS state              │
-└─────────────────────────────────────────────┘
-```
-
-### Request Flow with User Isolation
-
-```
-┌─────────┐      ┌──────────────┐      ┌──────────────┐      ┌──────────┐
-│ Claude  │─────▶│ Google OAuth │─────▶│ Durable      │─────▶│ D1       │
-│ Client  │      │ (authenticates│      │ Object       │      │ Database │
-│         │      │  user)        │      │ (MyMCP)      │      │          │
-│         │      │               │      │              │      │ WHERE    │
-│         │      │ Returns:      │      │ this.props = │      │ user_id= │
-│         │      │ email         │      │ { login:     │      │ email    │
-│         │◀─────│               │◀─────│   email }    │◀─────│          │
-└─────────┘      └──────────────┘      └──────────────┘      └──────────┘
-                                             │
-                                             ▼
-                                     User isolation boundary:
-                                     this.props.login → user_id
-                                     (Google email)
-```
-
-See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed walkthrough of the request lifecycle.
-
-## MCP Tools
-
-| Tool | Description |
-|------|-------------|
-| `add_card` | Create a new card with instructions and tags |
-| `get_due_cards` | Get cards due for review today |
-| `search_cards` | Full-text search across cards |
-| `get_all_cards` | List all your cards |
-| `review_card` | Submit review with FSRS rating (1-4: Again/Hard/Good/Easy) |
-| `edit_card` | Update card instructions or tags |
-| `delete_card` | Permanently remove a card |
-| `get_stats` | View statistics (total, due, by tag) |
-
-## Why MCP?
+## Why use this? 
 
 Traditional spaced repetition apps use static flashcards. This system stores *instructions* for Claude to generate dynamic practice problems:
 
 **Traditional flashcard:**
+
 ```
 Q: What is a Python decorator?
 A: A function that wraps another function
 ```
 
 **Spaced repetition MCP card:**
+
 ```
-Instructions: Generate problems about Python decorators.
-User struggles with nested decorators and passing arguments.
-Start simple, gradually increase complexity.
+Instructions: Generate and ask the user a simple problem about Python decorators.
 ```
 
 Claude reads these instructions and generates fresh, personalized practice every time.
 
-## Tech Stack
+Because it is an LLM, it can give you targeted feedback. Often when using Anki I would work on a problem, see the correct answer and then... not know how to change my approach. With this system, I learn much faster.
+
+Because it is an MCP, you do not need to pay for seperate credits, and you can frictionlessly create flashcards.
+
+**Example conversation:**
+
+```
+You: "Add cards for the subject you just tutored me on"
+Claude: 
+[Uses add cards tool to add cards]
+
+You: "Quiz me on the due cards"
+Claude: 
+[Uses the get_due_cards tool]
+[Writes you custom practice problem based on the cards]
+
+You: [Answers the problems]
+Claude: 
+[Provides you targeted feedback, rates your understanding 1-4]
+[Uses the review_card tool to submit the review]
+{On the remote server, the next optimal review time is calculated by the FSRS-5 alogrythm}
+```
+
+## Architecture
 
 - **Runtime**: Cloudflare Workers (serverless)
 - **Database**: Cloudflare D1 (SQLite with FTS5)
@@ -163,65 +60,44 @@ Claude reads these instructions and generates fresh, personalized practice every
 - **Language**: TypeScript
 - **Algorithm**: FSRS (Free Spaced Repetition Scheduler) via ts-fsrs
 
-## Cost
+```mermaid
+flowchart TD
+    subgraph Clients["MCP Clients"]
+        C1[Claude web/desktop/code]
+        C2[Cursor]
+        C3[Windsurf]
+        C4[ChatGPT]
+    end
 
-Free tier includes:
-- 100k requests/day
-- 5GB storage
-- 100k reads/day
+    subgraph Worker["Cloudflare Worker"]
+        W1[Google OAuth]
+        W2[MCP Tools]
+        W3[User Isolation]
+    end
 
-Plenty for personal use.
+    subgraph Database["Cloudflare D1"]
+        D1[Cards with FTS5 search]
+        D2[Tags]
+        D3[Review history & FSRS state]
+    end
 
-## Local Development
+    Clients -->|OAuth + MCP Protocol| Worker
+    Worker --> Database
 
-```bash
-# Create .dev.vars with dev OAuth credentials
-# (see SETUP.md for details)
-
-npx wrangler dev
-
-# Test with MCP Inspector
-npx @modelcontextprotocol/inspector
-# Enter: http://localhost:8788/sse
+    style Clients fill:#4a90d9,stroke:#2d5a87,color:#fff
+    style Worker fill:#f5a623,stroke:#c17d0e,color:#fff
+    style Database fill:#7ed321,stroke:#4a8c0f,color:#fff
 ```
-
-## Common Gotchas
-
-### For Contributors
-
-**1. Always filter by `user_id` in queries**
-```typescript
-// ❌ Wrong - no user isolation
-SELECT * FROM cards WHERE id = ?
-
-// ✅ Correct - filters by user
-SELECT * FROM cards WHERE id = ? AND user_id = ?
-```
-
-**2. Modifying cards table schema?**
-Don't forget to update FTS triggers in `schema.sql`! The `cards_fts` virtual table must stay in sync.
-
-**3. Testing OAuth locally?**
-You need a separate Google OAuth app with callback `http://localhost:8788/callback`. See [SETUP.md](SETUP.md).
-
-**4. Changes not showing up?**
-- Local dev: `wrangler dev` auto-reloads on file changes
-- Production: Run `npx wrangler deploy` to deploy changes
-
-**5. D1 migrations failing?**
-SQLite in D1 has limitations - you can't drop columns. Use `ALTER TABLE ADD COLUMN` for additive changes only.
-
-**6. Type errors after updating schema?**
-Run `npm run cf-typegen` to regenerate TypeScript types from `wrangler.jsonc`.
 
 ## Credits
 
-Based on:
 - [Model Context Protocol](https://modelcontextprotocol.io)
 - [Cloudflare MCP Templates](https://github.com/cloudflare/ai/tree/main/demos)
 - [FSRS Algorithm](https://github.com/open-spaced-repetition/fsrs4anki/wiki/The-Algorithm)
 - [ts-fsrs](https://github.com/open-spaced-repetition/ts-fsrs)
 
+
+
 ## License
 
-MIT
+GPL-3.0
