@@ -2,6 +2,8 @@
 
 A remote [Model Context Protocol](https://modelcontextprotocol.io) server that provides spaced repetition tool to Claude, Claude Code, Cursor, Amp and other MCP clients (including ChatGPT if you turn on developer mode I think).
 
+https://github.com/user-attachments/assets/f0841d5b-f7f4-45e4-a52b-a9b6ba47e670
+
 ## Quick Start
 
 ```
