@@ -53,15 +53,6 @@ Claude:
 {On the remote server, the next optimal review time is calculated by the FSRS-5 alogrythm}
 ```
 
-## Architecture
-
-- **Runtime**: Cloudflare Workers (serverless)
-- **Database**: Cloudflare D1 (SQLite with FTS5)
-- **Auth**: Google OAuth via workers-oauth-provider
-- **Protocol**: MCP (Model Context Protocol)
-- **Language**: TypeScript
-- **Algorithm**: FSRS (Free Spaced Repetition Scheduler) via ts-fsrs
-
 ```mermaid
 flowchart TD
     subgraph Clients["MCP Clients"]
