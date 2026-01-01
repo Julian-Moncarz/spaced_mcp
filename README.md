@@ -16,26 +16,27 @@ https://spaced-mcp-server.spaced-repetition-mcp.workers.dev/mcp
 
 ## Why use this? 
 
-Traditional spaced repetition apps use static flashcards. This system stores *instructions* for Claude to generate dynamic practice problems:
+A few reasons:
 
-**Traditional flashcard:**
+1.  *instructions* for Claude to generate questions instead of static cards. Often, I found myself memorizing the answer to the specific question I had put on an Anki card rather than getting better at solving that _type of problem_. This system solves that - you can simply tell claude "generate X type of problem" and you will get a unique question each time, preventing memorization.
+
+**Normal flashcard:**
 
 ```
 Q: What is a Python decorator?
 A: A function that wraps another function
 ```
 
-**Spaced repetition MCP card:**
+**SR MCP card:**
 
 ```
 Instructions: Generate and ask the user a simple problem about Python decorators.
 ```
 
-Claude reads these instructions and generates fresh, personalized practice every time.
 
-Because it is an LLM, it can give you targeted feedback. Often when using Anki I would work on a problem, see the correct answer and then... not know how to change my approach. With this system, I learn much faster.
+2. Because you are simply talking to an LLM, it can give you targeted feedback. Often when using Anki I would work on a problem, see the correct answer and then... not know how to change my approach. With this system, I learn much faster.
 
-Because it is an MCP, you do not need to pay for seperate credits, and you can frictionlessly create flashcards.
+3. Because it is an MCP, you can hook it up to whichever AI you pay for - this means you don't need to buy credits! It also means that you can frictionlessly create flashcards from whatever content you have been talking with the LLM about by simply asking.
 
 **Example conversation:**
 
