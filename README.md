@@ -56,6 +56,7 @@ Claude:
 [Uses the review_card tool to submit the review]
 {On the remote server, the next optimal review time is calculated by the FSRS-5 alogrythm}
 ```
+## Architecture 
 
 ```mermaid
 flowchart TD
