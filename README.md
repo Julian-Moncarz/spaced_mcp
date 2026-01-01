@@ -87,6 +87,8 @@ flowchart TD
     style Database fill:#7ed321,stroke:#4a8c0f,color:#fff
 ```
 
+privacy note: there is currently no mechanism to prevent me from reading your cards - if enough people start using this I will add one. In the meantime, feel free to clone this and set it up for yourself (your coding agent of chjoice should be able to do it easily and cloudflair's free tier means you don't need to pay!)
+
 ## Credits
 
 - [Model Context Protocol](https://modelcontextprotocol.io)
