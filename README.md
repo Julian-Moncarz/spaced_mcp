@@ -1,11 +1,9 @@
 # Spaced Repetition MCP Server
 
-A remote [Model Context Protocol](https://modelcontextprotocol.io) server that provides spaced repetition tool to Claude, Claude Code, Cursor, Amp and other MCP clients.
+A remote [Model Context Protocol](https://modelcontextprotocol.io) server that provides spaced repetition tool to Claude, Claude Code, Cursor, Amp and other MCP clients. I strongly suggest using a non-thinking fast model (eg Claude Haiku 4.5 with thinking off).
 
 For ChatGPT:
 go to Settings > Apps > Advanced settings, enable Developer Mode, and then connect to the MCP server.
-
-https://github.com/user-attachments/assets/f0841d5b-f7f4-45e4-a52b-a9b6ba47e670
 
 ## Quick Start
 
@@ -13,6 +11,8 @@ https://github.com/user-attachments/assets/f0841d5b-f7f4-45e4-a52b-a9b6ba47e670
 Add this URL to your MCP client:
 https://spaced-mcp-server.spaced-repetition-mcp.workers.dev/mcp
 ```
+
+https://github.com/user-attachments/assets/f0841d5b-f7f4-45e4-a52b-a9b6ba47e670
 
 ## Why use this? 
 
